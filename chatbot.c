@@ -169,10 +169,8 @@ int chatbot_do_exit(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_load(const char *intent) {
-
-	/* TO BE IMPLEMENTED */
-
-	return 0;
+	// fitri
+	return compare_token(intent, "load") == 0;
 
 }
 
