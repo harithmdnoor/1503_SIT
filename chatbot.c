@@ -245,11 +245,8 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_reset(const char *intent) {
-
-	/* TO BE IMPLEMENTED */
-
-	return 0;
-
+	//harith
+    return compare_token(intent, "RESET") == 0;
 }
 
 
