@@ -34,6 +34,8 @@
 #include <string.h>
 #include "chat1503C.h"
 
+#define FILE_NAME "ICT1503C_Project_Sample.ini"
+
 /*
  * Get the response to a question.
  *
@@ -102,8 +104,19 @@ int knowledge_read(FILE *f) {
  */
 void knowledge_reset() {
 
-	/* TO BE IMPLEMENTED */
+  //Open file with "w" mode will overwrite the existing file making sure it is empty
+	fp = fopen(FILE_NAME, "w");
 
+  //Error checking if file cant be opened or dont exist
+  if (fp == NULL) {
+    perror("Error opening file");
+    return 1;
+  }
+
+  //Close file
+  fclose(fp);
+
+  return;
 }
 
 
