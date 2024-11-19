@@ -246,7 +246,7 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
  */
 int chatbot_is_reset(const char *intent) {
 	//harith
-    return compare_token(intent, "RESET") == 0;
+    return compare_token(intent, "RESET") == 0 || compare_token(intent, "reset") == 0;
 }
 
 
@@ -257,12 +257,14 @@ int chatbot_is_reset(const char *intent) {
  * function is used.
  *
  * Returns:
- *   0 (the chatbot always continues chatting after beign reset)
+ *   0 (the chatbot always continues chatting after being reset)
+ *
+ * CONTRIBUTED BY : RAZAN
  */
 int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
 
-	/* TO BE IMPLEMENTED */
-
+	knowledge_reset(); // Clear conversation history
+	snprintf(response, n, "Chatbot reset.");
 	return 0;
 
 }
