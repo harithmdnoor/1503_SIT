@@ -282,7 +282,7 @@ int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_save(const char *intent) {
-	return compare_token(intent, "save") == 0;
+	return compare_token(intent, "save") == 0 || compare_token(intent, "SAVE") == 0;
 }
 
 
