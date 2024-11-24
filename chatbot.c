@@ -59,8 +59,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include "chat1503C.h"
 
+static char last_intent[MAX_INTENT] = "";
+static char last_entity[MAX_ENTITY] = "";
 
 /*
  * Get the name of the chatbot.
@@ -193,7 +196,7 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
 }
 
 
-/*
+/* CONTRIBUTED BY : RAZAN
  * Determine whether an intent is a question.
  *
  * Input:
@@ -205,14 +208,31 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
  */
 int chatbot_is_question(const char *intent) {
 
-	/* TO BE IMPLEMENTED */
+	if (intent == NULL){
+		return 0;
+	}
+
+	/* Variables for method */
+	char intent_lower[MAX_INTENT];
+	int i = 0;
+	
+	/* Copy and convert to lower case while handling buffer*/
+
+	while (intent[i] != '\0' && i < MAX_INTENT - 1){
+		intent_lower[i] = tolower(intent[i]);
+		i++;
+	}
+	intent_lower[i] = '\0';
+	
+	/* Compare the intent if it is What,Where or Who respectively*/
+	if (compare_token(intent_lower, "what") || compare_token(intent_lower, "where") || compare_token(intent_lower, "who")) return 1;
 
 	return 0;
 
 }
 
 
-/*
+/* CONTRIBUTED BY : RAZAN
  * Answer a question.
  *
  * inv[0] contains the the question word.
@@ -224,13 +244,102 @@ int chatbot_is_question(const char *intent) {
  *
  * Returns:
  *   0 (the chatbot always continues chatting after a question)
+ *  STILL NEED TO IMPLEMENT
  */
 int chatbot_do_question(int inc, char *inv[], char *response, int n) {
 
-	/* TO BE IMPLEMENTED */
+    // First check if this is an answer to a previous question
+    if (!chatbot_is_question(inv[0])) {
+        // Only process answer if we have a previous question
+        if (strlen(last_intent) == 0 || strlen(last_entity) == 0) {
+            snprintf(response, n, "Please ask a question first.");
+            return 0;
+        }
 
-	return 0;
+        // This might be an answer - combine all words into the response
+        char answer[MAX_RESPONSE] = "";
+        for (int i = 0; i < inc; i++) {
+            if (i > 0) strcat(answer, " ");
+            strcat(answer, inv[i]);
+        }
+        
+        // Put this into the knowledge base
+        int result = knowledge_put(last_intent, last_entity, answer);
+        if (result == KB_OK) {
+            snprintf(response, n, "Thank you.");
+        } else {
+            snprintf(response, n, "I couldn't understand that response.");
+        }
 
+        // Clear the last question
+        last_intent[0] = '\0';
+        last_entity[0] = '\0';
+        return 0;
+    }
+
+    if (inc < 2) {
+        snprintf(response, n, "Please ask a question.");
+        return 0;
+    }
+
+    // Get the intent
+    const char *intent = inv[0];
+
+    int entity_start = 1;
+    if (inc > 2 && (compare_token(inv[1], "is") == 0 || compare_token(inv[1],"are") == 0)){
+        entity_start = 2;
+    }
+
+    // Check if we have an entity after the words "is/are"
+    if (entity_start >= inc){
+        snprintf(response, n, "What would you like to know about?");
+        return 0;
+    }
+
+    char entity[MAX_ENTITY] = "";
+    int entity_length = 0;
+
+    // Combine words with spaces between them
+    for (int i = entity_start; i<inc; i++) {
+        // Add space before words
+        if (entity_length > 0){
+            strcat(entity, " ");
+            entity_length++;
+        }
+
+        if (entity_length + strlen(inv[i]) >= MAX_ENTITY - 1){
+            snprintf(response, n, "Sorry, that entity name is too long.");
+            return 0;
+        }
+        // Add the word
+        strcat(entity, inv[i]);
+        entity_length += strlen(inv[i]);
+    }
+
+    // Store the current question for potential answer
+    strncpy(last_intent, intent, MAX_INTENT - 1);
+    last_intent[MAX_INTENT - 1] = '\0';
+    strncpy(last_entity, entity, MAX_ENTITY - 1);
+    last_entity[MAX_ENTITY - 1] = '\0';
+
+    // Get response from knowledge_base
+    int result = knowledge_get(intent, entity, response, n);
+
+    // Handle the result
+    if (result == KB_NOTFOUND){
+        // If no knowledge, reply "I don't know" followed by the question.
+        snprintf(response, n, "I don't know. ");
+        if (entity_start == 2) {
+            snprintf(response + strlen(response), n - strlen(response), 
+                    "%s %s %s?", intent, inv[1], entity);
+        } 
+        else {
+            snprintf(response + strlen(response), n - strlen(response), 
+                    "%s %s?", intent, entity);
+        }
+    }
+    
+    return 0;
 }
 
 
@@ -281,7 +390,11 @@ int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_save(const char *intent) {
-	return compare_token(intent, "save") == 0 || compare_token(intent, "SAVE") == 0;
+
+	/* TO BE IMPLEMENTED */
+
+	return 0;
+
 }
 
 

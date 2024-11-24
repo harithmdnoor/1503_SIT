@@ -36,6 +36,27 @@
 
 #define FILE_NAME "ICT1503C_Project_Sample.ini"
 
+// Structure for entity response.
+typedef struct {
+  char entity[MAX_ENTITY];
+  char response[MAX_RESPONSE];
+} KnowledgeReply;
+
+// Structure for each intent.
+typedef struct {
+  char intent[MAX_INTENT];
+  KnowledgeReply *items;
+  int item_count;
+} IntentSection;
+
+// Global knowledge base for the Intent.
+static IntentSection sections[] = {
+
+  {"what", NULL, 0},
+  {"where", NULL, 0},
+  {"who", NULL, 0}
+};
+
 /*
  * Get the response to a question.
  *
@@ -105,29 +126,63 @@ int knowledge_read(FILE *f) {
 void knowledge_reset() {
 
   //Open file with "w" mode will overwrite the existing file making sure it is empty
-	fp = fopen(FILE_NAME, "w");
+	FILE *fp;
+  fp = fopen(FILE_NAME, "w");
 
   //Error checking if file cant be opened or dont exist
   if (fp == NULL) {
     perror("Error opening file");
-    return 1;
+    return;
   }
 
   //Close file
   fclose(fp);
-
-  return;
 }
 
 
 /*
+ * CONTRIBUTED BY : RAZAN 
  * Write the knowledge base to a file.
  *
  * Input:
  *   f - the file
+ * STILL NEED TO BE IMPLEMENTED.
  */
 void knowledge_write(FILE *f) {
 
-	/* TO BE IMPLEMENTED */
+	if (f = NULL) {
+    printf("Error: Cannot write to file.");
+    return;
+  }
 
+  for (int i =0; i<sizeof(sections)/sizeof(sections[0]); i++){
+    /* Write section header, check if there is an intent. */
+    if (fprintf(f, "[%s]\n", sections[i].intent) < 0) {
+        fprintf(stderr, "Error: Failed to write section header [%s]\n", sections[i].intent);
+        return;
+    }
+
+    /* Write all entity-response pairs for this intent */
+     for (int j = 0; j < sections[i].item_count; j++) {
+          if (fprintf(f, "%s=%s\n", sections[i].items[j].entity, sections[i].items[j].response) < 0) {
+              fprintf(stderr, "Error: Failed to write entry in [%s] section\n", 
+                      sections[i].intent);
+              return;
+          }
+      }
+
+      /* Add blank line between sections (except after last section) */
+      if (i < sizeof(sections)/sizeof(sections[0]) - 1) {
+          if (fprintf(f, "\n") < 0) {
+              fprintf(stderr, "Error: Failed to write newline after section\n");
+              return;
+          }
+        }
+    }
+
+    /* Ensure all data is written */
+    if (fflush(f) != 0) {
+        fprintf(stderr, "Error: Failed to flush file buffer\n");
+        return;
+    }
 }
