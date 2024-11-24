@@ -105,7 +105,7 @@ int knowledge_read(FILE *f) {
 void knowledge_reset() {
 
   //Open file with "w" mode will overwrite the existing file making sure it is empty
-	fp = fopen(FILE_NAME, "w");
+	FILE *fp = fopen(FILE_NAME, "w");
 
   //Error checking if file cant be opened or dont exist
   if (fp == NULL) {
