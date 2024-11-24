@@ -35,6 +35,15 @@
 #include "chat1503C.h"
 
 #define FILE_NAME "ICT1503C_Project_Sample.ini"
+#define MAX_KNOWLEDGE_BASE_SIZE   64
+static KnowledgeEntry knowledge_base[MAX_KNOWLEDGE_BASE_SIZE];
+static int knowledge_base_size = 0; 
+
+typedef struct {
+        char intent[MAX_INTENT];
+        char entity[MAX_ENTITY];
+        char response[MAX_RESPONSE];
+    } KnowledgeEntry;
 
 /*
  * Get the response to a question.
@@ -92,11 +101,74 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
  * Returns: the number of entity/response pairs successful read from the file
  */
 int knowledge_read(FILE *f) {
+    // Return if file is NULL
+    if (f == NULL) {
+        return 0;
+    }
 
-	/* TO BE IMPLEMENTED */
+    char line[MAX_ENTITY + MAX_RESPONSE + 2];
+    char intent[MAX_INTENT];
+    char entity[MAX_ENTITY];
+    char response[MAX_RESPONSE];
 
-	return 0;
+    int count = 0;
+    int in_section = 0;
+
+    // Read each line from the file
+    while (fgets(line, sizeof(line), f) != NULL) {
+        // Remove trailing newline character
+        char *newline = strchr(line, '\n');
+        if (newline) {
+            *newline = '\0';
+        }
+
+        // Skip blank lines
+        if (line[0] == '\0') {
+            continue;
+        }
+
+        // Check if the line is a section header
+        if (line[0] == '[') {
+            char *end_bracket = strchr(line, ']');
+            if (end_bracket) {
+                *end_bracket = '\0';
+                strncpy(intent, line + 1, MAX_INTENT - 1);
+                intent[MAX_INTENT - 1] = '\0';
+                in_section = 1;
+            } else {
+                in_section = 0;
+            }
+            continue;
+        }
+
+        // Parse entity-response pairs if in a valid section
+        if (in_section) {
+            char *equals_sign = strchr(line, '=');
+            if (equals_sign) {
+                *equals_sign = '\0';
+                strncpy(entity, line, MAX_ENTITY - 1);
+                entity[MAX_ENTITY - 1] = '\0';
+                strncpy(response, equals_sign + 1, MAX_RESPONSE - 1);
+                response[MAX_RESPONSE - 1] = '\0';
+
+                // Add entity-response pair to the knowledge base
+                if (knowledge_base_size < MAX_KNOWLEDGE_BASE_SIZE) {
+                    strncpy(knowledge_base[knowledge_base_size].intent, intent, MAX_INTENT - 1);
+                    knowledge_base[knowledge_base_size].intent[MAX_INTENT - 1] = '\0';
+                    strncpy(knowledge_base[knowledge_base_size].entity, entity, MAX_ENTITY - 1);
+                    knowledge_base[knowledge_base_size].entity[MAX_ENTITY - 1] = '\0';
+                    strncpy(knowledge_base[knowledge_base_size].response, response, MAX_RESPONSE - 1);
+                    knowledge_base[knowledge_base_size].response[MAX_RESPONSE - 1] = '\0';
+                    knowledge_base_size++;
+                    count++;
+                }
+            }
+        }
+    }
+
+    return count;
 }
+
 
 
 /*
