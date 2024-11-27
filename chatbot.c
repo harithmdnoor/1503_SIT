@@ -185,11 +185,31 @@ int chatbot_is_load(const char *intent) {
  *   0 (the chatbot always continues chatting after loading knowledge)
  */
 int chatbot_do_load(int inc, char *inv[], char *response, int n) {
+// Ensure there's a file name provided
+    if (inc < 2) {
+        snprintf(response, n, "Please specify the file to load from.");
+        return 0;
+    }
 
-	/* TO BE IMPLEMENTED */
+    // Open the file specified in the second word of the user input
+    const char *filename = inv[1];
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        snprintf(response, n, "Failed to open file \"%s\". Please check the file path.", filename);
+        return 0;
+    }
 
-	return 0;
+    // Use knowledge_read() to read the knowledge base from the file
+    int pairs_read = knowledge_read(file);
+    fclose(file);
 
+    if (pairs_read < 0) {
+        snprintf(response, n, "An error occurred while loading the knowledge base.");
+    } else {
+        snprintf(response, n, "Successfully loaded %d knowledge entries from \"%s\".", pairs_read, filename);
+    }
+
+    return 0;
 }
 
 
