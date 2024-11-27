@@ -70,28 +70,17 @@ static KnowledgeNode* knowledge_base = NULL;  // Head of the linked list
 // Get the response to a question
 
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
-    // Debug print
-    printf("DEBUG: Searching for - Intent: %s, Entity: %s\n", intent, entity);
-
     // Input validation
     if (intent == NULL || entity == NULL || response == NULL || n <= 0) {
         return KB_INVALID;
     }
 
-    // Print current knowledge base content
+    // Search through the linked list
     KnowledgeNode* current = knowledge_base;
-    printf("DEBUG: Current knowledge base contents:\n");
-    while (current != NULL) {
-        printf("  Intent: %s, Entity: %s, Response: %s\n",
-               current->intent, current->entity, current->response);
-        current = current->next;
-    }
-
-    // Reset current for actual search
-    current = knowledge_base;
     while (current != NULL) {
         if (strcasecmp(current->intent, intent) == 0 && 
             strcasecmp(current->entity, entity) == 0) {
+            // Copy the response safely
             strncpy(response, current->response, n - 1);
             response[n - 1] = '\0';
             return KB_OK;
@@ -99,6 +88,7 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
         current = current->next;
     }
 
+    // No matching response found
     return KB_NOTFOUND;
 }
 
@@ -121,13 +111,29 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  *   KB_INVALID, if the intent is not a valid question word
  */
 int knowledge_put(const char *intent, const char *entity, const char *response) {
-    // Debug print to see what's being stored
-    printf("DEBUG: Storing - Intent: %s, Entity: %s, Response: %s\n", 
-           intent, entity, response);
-
     // Validate inputs
     if (intent == NULL || entity == NULL || response == NULL) {
         return KB_INVALID;
+    }
+
+    // Validate intent is a recognized question word
+    if (strcasecmp(intent, "what") != 0 && 
+        strcasecmp(intent, "where") != 0 && 
+        strcasecmp(intent, "who") != 0) {
+        return KB_INVALID;
+    }
+
+    // Check if entry exists
+    KnowledgeNode* current = knowledge_base;
+    while (current != NULL) {
+        if (strcasecmp(current->intent, intent) == 0 && 
+            strcasecmp(current->entity, entity) == 0) {
+            // Update existing entry
+            strncpy(current->response, response, MAX_RESPONSE - 1);
+            current->response[MAX_RESPONSE - 1] = '\0';
+            return KB_OK;
+        }
+        current = current->next;
     }
 
     // Create new node
@@ -147,15 +153,6 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
     // Add to front of list
     new_node->next = knowledge_base;
     knowledge_base = new_node;
-
-    // Write to file immediately after updating memory
-    FILE *fp = fopen(FILE_NAME, "a");  // Open in append mode
-    if (fp != NULL) {
-        // Check if we need to write the intent header
-        fprintf(fp, "[%s]\n%s=%s\n\n", intent, entity, response);
-        fclose(fp);
-    }
-
     return KB_OK;
 }
 
