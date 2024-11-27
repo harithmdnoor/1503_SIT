@@ -317,6 +317,13 @@ int chatbot_is_save(const char *intent) {
 int chatbot_do_save(int inc, char *inv[], char *response, int n) {
 
 	/* TO BE IMPLEMENTED */
+	FILE *fp = fopen("ICT1503C_Project_Sample.ini", "w");
+	if (fp == NULL) {
+		perror("Error opening file");
+		return 1;
+	}
+	knowledge_write(fp);
+	fclose(fp);
 
 	return 0;
 
