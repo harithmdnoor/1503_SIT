@@ -97,10 +97,41 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  *   KB_INVALID, if the intent is not a valid question word
  */
 int knowledge_put(const char *intent, const char *entity, const char *response) {
+    // Validate intent
+    if (strcmp(intent, "what") != 0 && strcmp(intent, "where") != 0 && strcmp(intent, "who") != 0) {
+        return KB_INVALID;
+    }
 
-	/* TO BE IMPLEMENTED */
+    // Traverse the linked list to find an existing node with the same intent and entity
+    KnowledgeNode *current = knowledgeBase;
+    while (current != NULL) {
+        if (strcmp(current->intent, intent) == 0 && strcmp(current->entity, entity) == 0) {
+            // Update the response if the intent and entity match
+            strncpy(current->response, response, MAX_RESPONSE - 1);
+            current->response[MAX_RESPONSE - 1] = '\0'; // Ensure null-termination
+            return KB_OK;
+        }
+        current = current->next;
+    }
 
-	return KB_INVALID;
+    // If no match is found, create a new node
+    KnowledgeNode *newNode = (KnowledgeNode *)malloc(sizeof(KnowledgeNode));
+    if (newNode == NULL) {
+        return KB_NOMEM; // Memory allocation failure
+    }
+
+    // Initialize the new node
+    strncpy(newNode->intent, intent, MAX_INTENT - 1);
+    newNode->intent[MAX_INTENT - 1] = '\0';
+    strncpy(newNode->entity, entity, MAX_ENTITY - 1);
+    newNode->entity[MAX_ENTITY - 1] = '\0';
+    strncpy(newNode->response, response, MAX_RESPONSE - 1);
+    newNode->response[MAX_RESPONSE - 1] = '\0';
+    newNode->next = knowledgeBase;
+
+    // Insert the new node at the beginning of the linked list
+    knowledgeBase = newNode;
+    return KB_OK;
 
 }
 
