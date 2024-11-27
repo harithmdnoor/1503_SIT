@@ -266,7 +266,13 @@ int chatbot_is_question(const char *intent) {
  *   0 (the chatbot always continues chatting after a question)
  *  STILL NEED TO IMPLEMENT
  */
+
 int chatbot_do_question(int inc, char *inv[], char *response, int n) {
+    // Input validation
+    if (inc < 1 || inv == NULL || response == NULL || n <= 0) {
+        snprintf(response, n, "Invalid input.");
+        return 0;
+    }
 
     // First check if this is an answer to a previous question
     if (!chatbot_is_question(inv[0])) {
@@ -276,15 +282,23 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
             return 0;
         }
 
-        // This might be an answer - combine all words into the response
+        // Combine all words into the response
         char answer[MAX_RESPONSE] = "";
         for (int i = 0; i < inc; i++) {
             if (i > 0) strcat(answer, " ");
             strcat(answer, inv[i]);
         }
         
+        // Convert intent to lowercase before storing
+        char intent_lower[MAX_INTENT];
+        strncpy(intent_lower, last_intent, MAX_INTENT - 1);
+        intent_lower[MAX_INTENT - 1] = '\0';
+        for (int i = 0; intent_lower[i]; i++) {
+            intent_lower[i] = tolower(intent_lower[i]);
+        }
+        
         // Put this into the knowledge base
-        int result = knowledge_put(last_intent, last_entity, answer);
+        int result = knowledge_put(intent_lower, last_entity, answer);
         if (result == KB_OK) {
             snprintf(response, n, "Thank you.");
         } else {
@@ -297,68 +311,64 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
+    // Handle question processing
     if (inc < 2) {
-        snprintf(response, n, "Please ask a question.");
+        snprintf(response, n, "Please ask a complete question.");
         return 0;
     }
 
-    // Get the intent
-    const char *intent = inv[0];
+    // Get the intent and convert to lowercase
+    char intent[MAX_INTENT];
+    strncpy(intent, inv[0], MAX_INTENT - 1);
+    intent[MAX_INTENT - 1] = '\0';
+    for (int i = 0; intent[i]; i++) {
+        intent[i] = tolower(intent[i]);
+    }
 
+    // Find where the entity starts (after "is"/"are" if present)
     int entity_start = 1;
-    if (inc > 2 && (compare_token(inv[1], "is") == 0 || compare_token(inv[1],"are") == 0)){
+    if (inc > 2 && (compare_token(inv[1], "is") == 0 || compare_token(inv[1], "are") == 0)) {
         entity_start = 2;
     }
 
-    // Check if we have an entity after the words "is/are"
-    if (entity_start >= inc){
+    if (entity_start >= inc) {
         snprintf(response, n, "What would you like to know about?");
         return 0;
     }
 
+    // Build entity string with exact casing from input
     char entity[MAX_ENTITY] = "";
-    int entity_length = 0;
-
-    // Combine words with spaces between them
-    for (int i = entity_start; i<inc; i++) {
-        // Add space before words
-        if (entity_length > 0){
+    for (int i = entity_start; i < inc; i++) {
+        if (strlen(entity) > 0) {
             strcat(entity, " ");
-            entity_length++;
         }
-
-        if (entity_length + strlen(inv[i]) >= MAX_ENTITY - 1){
-            snprintf(response, n, "Sorry, that entity name is too long.");
-            return 0;
-        }
-        // Add the word
         strcat(entity, inv[i]);
-        entity_length += strlen(inv[i]);
     }
 
-    // Store the current question for potential answer
+    // Store current question for potential answer
     strncpy(last_intent, intent, MAX_INTENT - 1);
     last_intent[MAX_INTENT - 1] = '\0';
     strncpy(last_entity, entity, MAX_ENTITY - 1);
     last_entity[MAX_ENTITY - 1] = '\0';
 
-    // Get response from knowledge_base
+    // Get response from knowledge base
     int result = knowledge_get(intent, entity, response, n);
 
     // Handle the result
-    if (result == KB_NOTFOUND){
-        // If no knowledge, reply "I don't know" followed by the question.
+    if (result == KB_NOTFOUND) {
+        // If no knowledge found, format the question back
         snprintf(response, n, "I don't know. ");
         if (entity_start == 2) {
             snprintf(response + strlen(response), n - strlen(response), 
-                    "%s %s %s?", intent, inv[1], entity);
-        } 
-        else {
+                    "%s %s %s?", inv[0], inv[1], entity);
+        } else {
             snprintf(response + strlen(response), n - strlen(response), 
-                    "%s %s?", intent, entity);
+                    "%s %s?", inv[0], entity);
         }
+    } else if (result == KB_INVALID) {
+        snprintf(response, n, "I don't understand that type of question.");
     }
-    
+
     return 0;
 }
 
@@ -411,9 +421,7 @@ int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
  */
 int chatbot_is_save(const char *intent) {
 
-	/* TO BE IMPLEMENTED */
-
-	return 0;
+		return compare_token(intent, "save") == 0 || compare_token(intent, "SAVE") == 0;
 
 }
 
@@ -428,18 +436,33 @@ int chatbot_is_save(const char *intent) {
  *   0 (the chatbot always continues chatting after saving knowledge)
  */
 int chatbot_do_save(int inc, char *inv[], char *response, int n) {
+    // Check if filename is provided
+    if (inc < 2) {
+        snprintf(response, n, "Please specify a file to save to.");
+        return 0;
+    }
 
-	/* TO BE IMPLEMENTED */
-	FILE *fp = fopen("ICT1503C_Project_Sample.ini", "w");
-	if (fp == NULL) {
-		perror("Error opening file");
-		return 1;
-	}
-	knowledge_write(fp);
-	fclose(fp);
+    // Check for "as" or "to" and adjust filename index
+    int filename_index = 1;
+    if (inc > 2 && (compare_token(inv[1], "as") == 0 || compare_token(inv[1], "to") == 0)) {
+        filename_index = 2;
+        if (filename_index >= inc) {
+            snprintf(response, n, "Please specify a file to save to.");
+            return 0;
+        }
+    }
 
-	return 0;
+    FILE *fp = fopen(inv[filename_index], "w");
+    if (fp == NULL) {
+        snprintf(response, n, "Failed to open file \"%s\".", inv[filename_index]);
+        return 0;
+    }
 
+    knowledge_write(fp);
+    fclose(fp);
+    
+    snprintf(response, n, "My knowledge has been saved to %s.", inv[filename_index]);
+    return 0;
 }
 
 

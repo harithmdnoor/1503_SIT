@@ -35,15 +35,17 @@
 #include "chat1503C.h"
 
 #define FILE_NAME "ICT1503C_Project_Sample.ini"
-#define MAX_KNOWLEDGE_BASE_SIZE   64
-static KnowledgeEntry knowledge_base[MAX_KNOWLEDGE_BASE_SIZE];
-static int knowledge_base_size = 0; 
+
 
 typedef struct {
-        char intent[MAX_INTENT];
-        char entity[MAX_ENTITY];
-        char response[MAX_RESPONSE];
-    } KnowledgeEntry;
+    char intent[MAX_INTENT];
+    char entity[MAX_ENTITY];
+    char response[MAX_RESPONSE];
+} KnowledgeEntry;
+
+#define MAX_KNOWLEDGE_BASE_SIZE   64
+static KnowledgeEntry knowledge_base[MAX_KNOWLEDGE_BASE_SIZE];
+static int knowledge_base_size = 0;
 
 /*
  * Get the response to a question.
@@ -61,24 +63,33 @@ typedef struct {
  */
 // Get the response to a question
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
-    // Return invalid if any input is NULL
-    if (intent == NULL || entity == NULL || response == NULL) {
+    // Input validation
+    if (intent == NULL || entity == NULL || response == NULL || n <= 0) {
         return KB_INVALID;
     }
 
-    // Search the knowledge base for a matching intent and entity
+    // Validate intent is a recognized question word - make case-insensitive
+    if (strcasecmp(intent, "what") != 0 && 
+        strcasecmp(intent, "where") != 0 && 
+        strcasecmp(intent, "who") != 0) {
+        return KB_INVALID;
+    }
+
+    // Search through the knowledge base array
     for (int i = 0; i < knowledge_base_size; i++) {
-        if (strcmp(knowledge_base[i].intent, intent) == 0 && strcmp(knowledge_base[i].entity, entity) == 0) {
-            // Copy the response to the provided buffer
+        if (strcasecmp(knowledge_base[i].intent, intent) == 0 && 
+            strcasecmp(knowledge_base[i].entity, entity) == 0) {
+            // Copy the response safely
             strncpy(response, knowledge_base[i].response, n - 1);
             response[n - 1] = '\0';
             return KB_OK;
         }
     }
 
-    // Return not found if no match is found
+    // No matching response found
     return KB_NOTFOUND;
 }
+ 
 
 
 /*
@@ -97,42 +108,49 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  *   KB_INVALID, if the intent is not a valid question word
  */
 int knowledge_put(const char *intent, const char *entity, const char *response) {
-    // Validate intent
-    if (strcmp(intent, "what") != 0 && strcmp(intent, "where") != 0 && strcmp(intent, "who") != 0) {
+    // Validate inputs
+    if (intent == NULL || entity == NULL || response == NULL) {
         return KB_INVALID;
     }
 
-    // Traverse the linked list to find an existing node with the same intent and entity
-    KnowledgeNode *current = knowledgeBase;
-    while (current != NULL) {
-        if (strcmp(current->intent, intent) == 0 && strcmp(current->entity, entity) == 0) {
-            // Update the response if the intent and entity match
-            strncpy(current->response, response, MAX_RESPONSE - 1);
-            current->response[MAX_RESPONSE - 1] = '\0'; // Ensure null-termination
-            return KB_OK;
+    // Validate intent is a recognized question word - make case-insensitive
+    if (strcasecmp(intent, "what") != 0 && 
+        strcasecmp(intent, "where") != 0 && 
+        strcasecmp(intent, "who") != 0) {
+        return KB_INVALID;
+    }
+
+    // Check if we're at capacity
+    if (knowledge_base_size >= MAX_KNOWLEDGE_BASE_SIZE) {
+        return KB_NOMEM;
+    }
+
+    // First, check if this intent/entity pair already exists
+    for (int i = 0; i < knowledge_base_size; i++) {
+        if (strcasecmp(knowledge_base[i].intent, intent) == 0 && 
+            strcasecmp(knowledge_base[i].entity, entity) == 0) {
+            // Update existing entry
+            strncpy(knowledge_base[i].response, response, MAX_RESPONSE - 1);
+            knowledge_base[i].response[MAX_RESPONSE - 1] = '\0';
+            return KB_OK;  // Changed to KB_OK per header definition
         }
-        current = current->next;
     }
 
-    // If no match is found, create a new node
-    KnowledgeNode *newNode = (KnowledgeNode *)malloc(sizeof(KnowledgeNode));
-    if (newNode == NULL) {
-        return KB_NOMEM; // Memory allocation failure
-    }
+    // If we get here, this is a new entry
+    // Copy the new data into the knowledge base
+    strncpy(knowledge_base[knowledge_base_size].intent, intent, MAX_INTENT - 1);
+    knowledge_base[knowledge_base_size].intent[MAX_INTENT - 1] = '\0';
+    
+    strncpy(knowledge_base[knowledge_base_size].entity, entity, MAX_ENTITY - 1);
+    knowledge_base[knowledge_base_size].entity[MAX_ENTITY - 1] = '\0';
+    
+    strncpy(knowledge_base[knowledge_base_size].response, response, MAX_RESPONSE - 1);
+    knowledge_base[knowledge_base_size].response[MAX_RESPONSE - 1] = '\0';
 
-    // Initialize the new node
-    strncpy(newNode->intent, intent, MAX_INTENT - 1);
-    newNode->intent[MAX_INTENT - 1] = '\0';
-    strncpy(newNode->entity, entity, MAX_ENTITY - 1);
-    newNode->entity[MAX_ENTITY - 1] = '\0';
-    strncpy(newNode->response, response, MAX_RESPONSE - 1);
-    newNode->response[MAX_RESPONSE - 1] = '\0';
-    newNode->next = knowledgeBase;
+    // Increment the size
+    knowledge_base_size++;
 
-    // Insert the new node at the beginning of the linked list
-    knowledgeBase = newNode;
-    return KB_OK;
-
+    return KB_OK; 
 }
 
 
@@ -219,20 +237,16 @@ int knowledge_read(FILE *f) {
  * Reset the knowledge base, removing all know entitities from all intents.
  */
 void knowledge_reset() {
-
-  //Open file with "w" mode will overwrite the existing file making sure it is empty
-	FILE *fp = fopen(FILE_NAME, "w");
-
-  //Error checking if file cant be opened or dont exist
-  if (fp == NULL) {
-    perror("Error opening file");
-    return 1;
-  }
-
-  //Close file
-  fclose(fp);
-
-  return;
+    // Reset the knowledge base size
+    knowledge_base_size = 0;
+    
+    // Clear the file
+    FILE *fp = fopen(FILE_NAME, "w");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    fclose(fp);
 }
 
 
