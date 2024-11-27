@@ -59,12 +59,25 @@ typedef struct {
  *   KB_NOTFOUND, if no response could be found
  *   KB_INVALID, if 'intent' is not a recognised question word
  */
+// Get the response to a question
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
+    // Return invalid if any input is NULL
+    if (intent == NULL || entity == NULL || response == NULL) {
+        return KB_INVALID;
+    }
 
-	/* TO BE IMPLEMENTED */
+    // Search the knowledge base for a matching intent and entity
+    for (int i = 0; i < knowledge_base_size; i++) {
+        if (strcmp(knowledge_base[i].intent, intent) == 0 && strcmp(knowledge_base[i].entity, entity) == 0) {
+            // Copy the response to the provided buffer
+            strncpy(response, knowledge_base[i].response, n - 1);
+            response[n - 1] = '\0';
+            return KB_OK;
+        }
+    }
 
-	return KB_NOTFOUND;
-
+    // Return not found if no match is found
+    return KB_NOTFOUND;
 }
 
 
