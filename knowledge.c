@@ -37,15 +37,21 @@
 #define FILE_NAME "ICT1503C_Project_Sample.ini"
 
 
-typedef struct {
+typedef struct KnowledgeNode {
     char intent[MAX_INTENT];
     char entity[MAX_ENTITY];
     char response[MAX_RESPONSE];
-} KnowledgeEntry;
+    struct KnowledgeNode* next;
+} KnowledgeNode;
+
+typedef struct WrittenIntent {
+    char intent[MAX_INTENT];
+    struct WrittenIntent* next;
+} WrittenIntent;
+
 
 #define MAX_KNOWLEDGE_BASE_SIZE   64
-static KnowledgeEntry knowledge_base[MAX_KNOWLEDGE_BASE_SIZE];
-static int knowledge_base_size = 0;
+static KnowledgeNode* knowledge_base = NULL;  // Head of the linked list
 
 /*
  * Get the response to a question.
@@ -62,33 +68,40 @@ static int knowledge_base_size = 0;
  *   KB_INVALID, if 'intent' is not a recognised question word
  */
 // Get the response to a question
+
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
+    // Debug print
+    printf("DEBUG: Searching for - Intent: %s, Entity: %s\n", intent, entity);
+
     // Input validation
     if (intent == NULL || entity == NULL || response == NULL || n <= 0) {
         return KB_INVALID;
     }
 
-    // Validate intent is a recognized question word - make case-insensitive
-    if (strcasecmp(intent, "what") != 0 && 
-        strcasecmp(intent, "where") != 0 && 
-        strcasecmp(intent, "who") != 0) {
-        return KB_INVALID;
+    // Print current knowledge base content
+    KnowledgeNode* current = knowledge_base;
+    printf("DEBUG: Current knowledge base contents:\n");
+    while (current != NULL) {
+        printf("  Intent: %s, Entity: %s, Response: %s\n",
+               current->intent, current->entity, current->response);
+        current = current->next;
     }
 
-    // Search through the knowledge base array
-    for (int i = 0; i < knowledge_base_size; i++) {
-        if (strcasecmp(knowledge_base[i].intent, intent) == 0 && 
-            strcasecmp(knowledge_base[i].entity, entity) == 0) {
-            // Copy the response safely
-            strncpy(response, knowledge_base[i].response, n - 1);
+    // Reset current for actual search
+    current = knowledge_base;
+    while (current != NULL) {
+        if (strcasecmp(current->intent, intent) == 0 && 
+            strcasecmp(current->entity, entity) == 0) {
+            strncpy(response, current->response, n - 1);
             response[n - 1] = '\0';
             return KB_OK;
         }
+        current = current->next;
     }
 
-    // No matching response found
     return KB_NOTFOUND;
 }
+
  
 
 
@@ -108,49 +121,42 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  *   KB_INVALID, if the intent is not a valid question word
  */
 int knowledge_put(const char *intent, const char *entity, const char *response) {
+    // Debug print to see what's being stored
+    printf("DEBUG: Storing - Intent: %s, Entity: %s, Response: %s\n", 
+           intent, entity, response);
+
     // Validate inputs
     if (intent == NULL || entity == NULL || response == NULL) {
         return KB_INVALID;
     }
 
-    // Validate intent is a recognized question word - make case-insensitive
-    if (strcasecmp(intent, "what") != 0 && 
-        strcasecmp(intent, "where") != 0 && 
-        strcasecmp(intent, "who") != 0) {
-        return KB_INVALID;
-    }
-
-    // Check if we're at capacity
-    if (knowledge_base_size >= MAX_KNOWLEDGE_BASE_SIZE) {
+    // Create new node
+    KnowledgeNode* new_node = (KnowledgeNode*)malloc(sizeof(KnowledgeNode));
+    if (new_node == NULL) {
         return KB_NOMEM;
     }
 
-    // First, check if this intent/entity pair already exists
-    for (int i = 0; i < knowledge_base_size; i++) {
-        if (strcasecmp(knowledge_base[i].intent, intent) == 0 && 
-            strcasecmp(knowledge_base[i].entity, entity) == 0) {
-            // Update existing entry
-            strncpy(knowledge_base[i].response, response, MAX_RESPONSE - 1);
-            knowledge_base[i].response[MAX_RESPONSE - 1] = '\0';
-            return KB_OK;  // Changed to KB_OK per header definition
-        }
+    // Initialize new node
+    strncpy(new_node->intent, intent, MAX_INTENT - 1);
+    new_node->intent[MAX_INTENT - 1] = '\0';
+    strncpy(new_node->entity, entity, MAX_ENTITY - 1);
+    new_node->entity[MAX_ENTITY - 1] = '\0';
+    strncpy(new_node->response, response, MAX_RESPONSE - 1);
+    new_node->response[MAX_RESPONSE - 1] = '\0';
+
+    // Add to front of list
+    new_node->next = knowledge_base;
+    knowledge_base = new_node;
+
+    // Write to file immediately after updating memory
+    FILE *fp = fopen(FILE_NAME, "a");  // Open in append mode
+    if (fp != NULL) {
+        // Check if we need to write the intent header
+        fprintf(fp, "[%s]\n%s=%s\n\n", intent, entity, response);
+        fclose(fp);
     }
 
-    // If we get here, this is a new entry
-    // Copy the new data into the knowledge base
-    strncpy(knowledge_base[knowledge_base_size].intent, intent, MAX_INTENT - 1);
-    knowledge_base[knowledge_base_size].intent[MAX_INTENT - 1] = '\0';
-    
-    strncpy(knowledge_base[knowledge_base_size].entity, entity, MAX_ENTITY - 1);
-    knowledge_base[knowledge_base_size].entity[MAX_ENTITY - 1] = '\0';
-    
-    strncpy(knowledge_base[knowledge_base_size].response, response, MAX_RESPONSE - 1);
-    knowledge_base[knowledge_base_size].response[MAX_RESPONSE - 1] = '\0';
-
-    // Increment the size
-    knowledge_base_size++;
-
-    return KB_OK; 
+    return KB_OK;
 }
 
 
@@ -163,7 +169,6 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
  * Returns: the number of entity/response pairs successful read from the file
  */
 int knowledge_read(FILE *f) {
-    // Return if file is NULL
     if (f == NULL) {
         return 0;
     }
@@ -172,24 +177,19 @@ int knowledge_read(FILE *f) {
     char intent[MAX_INTENT];
     char entity[MAX_ENTITY];
     char response[MAX_RESPONSE];
-
     int count = 0;
     int in_section = 0;
 
-    // Read each line from the file
     while (fgets(line, sizeof(line), f) != NULL) {
-        // Remove trailing newline character
         char *newline = strchr(line, '\n');
         if (newline) {
             *newline = '\0';
         }
 
-        // Skip blank lines
         if (line[0] == '\0') {
             continue;
         }
 
-        // Check if the line is a section header
         if (line[0] == '[') {
             char *end_bracket = strchr(line, ']');
             if (end_bracket) {
@@ -203,7 +203,6 @@ int knowledge_read(FILE *f) {
             continue;
         }
 
-        // Parse entity-response pairs if in a valid section
         if (in_section) {
             char *equals_sign = strchr(line, '=');
             if (equals_sign) {
@@ -213,15 +212,7 @@ int knowledge_read(FILE *f) {
                 strncpy(response, equals_sign + 1, MAX_RESPONSE - 1);
                 response[MAX_RESPONSE - 1] = '\0';
 
-                // Add entity-response pair to the knowledge base
-                if (knowledge_base_size < MAX_KNOWLEDGE_BASE_SIZE) {
-                    strncpy(knowledge_base[knowledge_base_size].intent, intent, MAX_INTENT - 1);
-                    knowledge_base[knowledge_base_size].intent[MAX_INTENT - 1] = '\0';
-                    strncpy(knowledge_base[knowledge_base_size].entity, entity, MAX_ENTITY - 1);
-                    knowledge_base[knowledge_base_size].entity[MAX_ENTITY - 1] = '\0';
-                    strncpy(knowledge_base[knowledge_base_size].response, response, MAX_RESPONSE - 1);
-                    knowledge_base[knowledge_base_size].response[MAX_RESPONSE - 1] = '\0';
-                    knowledge_base_size++;
+                if (knowledge_put(intent, entity, response) == KB_OK) {
                     count++;
                 }
             }
@@ -237,16 +228,20 @@ int knowledge_read(FILE *f) {
  * Reset the knowledge base, removing all know entitities from all intents.
  */
 void knowledge_reset() {
-    // Reset the knowledge base size
-    knowledge_base_size = 0;
-    
-    // Clear the file
-    FILE *fp = fopen(FILE_NAME, "w");
-    if (fp == NULL) {
-        perror("Error opening file");
-        return;
+    // Free all nodes
+    KnowledgeNode *current = knowledge_base;
+    while (current != NULL) {
+        KnowledgeNode *next = current->next;
+        free(current);
+        current = next;
     }
-    fclose(fp);
+    knowledge_base = NULL;
+
+    // Clear file
+    FILE *fp = fopen(FILE_NAME, "w");
+    if (fp != NULL) {
+        fclose(fp);
+    }
 }
 
 
@@ -262,33 +257,53 @@ void knowledge_write(FILE *f) {
         return;
     }
 
-    // Keep track of written intents to avoid duplicates
-    char written_intents[MAX_KNOWLEDGE_BASE_SIZE][MAX_INTENT] = {0};
+    WrittenIntent* written_intents = NULL;
     int written_count = 0;
 
-    for (int i = 0; i < knowledge_base_size; i++) { 
-        // Check if this intent has already been written
+    // For each node
+    KnowledgeNode *current = knowledge_base;
+    while (current != NULL) {
+        // Check if intent already written
+        WrittenIntent* check = written_intents;
         int already_written = 0;
-        for (int k = 0; k < written_count; k++) {
-            if (strcmp(written_intents[k], knowledge_base[i].intent) == 0) {
+        while (check != NULL) {
+            if (strcasecmp(check->intent, current->intent) == 0) {
                 already_written = 1;
                 break;
             }
+            check = check->next;
         }
 
         if (!already_written) {
-            // Write the intent
-            fprintf(f, "[%s]\n", knowledge_base[i].intent);
-            // Record that we've written this intent
-            strcpy(written_intents[written_count++], knowledge_base[i].intent);
-
-            // Write all matching entities and responses
-            for (int j = 0; j < knowledge_base_size; j++) { 
-                if (strcmp(knowledge_base[i].intent, knowledge_base[j].intent) == 0) {
-                    fprintf(f, "%s=%s\n", knowledge_base[j].entity, knowledge_base[j].response);
-                }
+            // Write intent header
+            fprintf(f, "[%s]\n", current->intent);
+            
+            // Add to written intents
+            WrittenIntent* new_intent = malloc(sizeof(WrittenIntent));
+            if (new_intent != NULL) {
+                strncpy(new_intent->intent, current->intent, MAX_INTENT - 1);
+                new_intent->intent[MAX_INTENT - 1] = '\0';
+                new_intent->next = written_intents;
+                written_intents = new_intent;
             }
-            fprintf(f, "\n"); // Add an extra newline for better readability
+
+            // Write all matching entries
+            KnowledgeNode *inner = knowledge_base;
+            while (inner != NULL) {
+                if (strcasecmp(inner->intent, current->intent) == 0) {
+                    fprintf(f, "%s=%s\n", inner->entity, inner->response);
+                }
+                inner = inner->next;
+            }
+            fprintf(f, "\n");
         }
+        current = current->next;
+    }
+
+    // Free written intents list
+    while (written_intents != NULL) {
+        WrittenIntent* next = written_intents->next;
+        free(written_intents);
+        written_intents = next;
     }
 }

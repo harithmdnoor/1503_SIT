@@ -252,7 +252,7 @@ int chatbot_is_question(const char *intent) {
 }
 
 
-/* CONTRIBUTED BY : RAZAN
+/* CONTRIBUTED BY : RAZAN & FITRI & HARITH & HAFIZ
  * Answer a question.
  *
  * inv[0] contains the the question word.
@@ -274,9 +274,11 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
-    // First check if this is an answer to a previous question
-    if (!chatbot_is_question(inv[0])) {
-        // Only process answer if we have a previous question
+    // Check if this is potentially an answer (i.e., not a question)
+    int is_answer = !chatbot_is_question(inv[0]);
+
+    if (is_answer) {
+        // If there was no previous question to answer
         if (strlen(last_intent) == 0 || strlen(last_entity) == 0) {
             snprintf(response, n, "Please ask a question first.");
             return 0;
@@ -289,16 +291,8 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
             strcat(answer, inv[i]);
         }
         
-        // Convert intent to lowercase before storing
-        char intent_lower[MAX_INTENT];
-        strncpy(intent_lower, last_intent, MAX_INTENT - 1);
-        intent_lower[MAX_INTENT - 1] = '\0';
-        for (int i = 0; intent_lower[i]; i++) {
-            intent_lower[i] = tolower(intent_lower[i]);
-        }
-        
-        // Put this into the knowledge base
-        int result = knowledge_put(intent_lower, last_entity, answer);
+        // Put this into the knowledge base using the previously stored intent
+        int result = knowledge_put(last_intent, last_entity, answer);
         if (result == KB_OK) {
             snprintf(response, n, "Thank you.");
         } else {
@@ -311,13 +305,14 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
+    // From here on, we're handling a new question
     // Handle question processing
     if (inc < 2) {
         snprintf(response, n, "Please ask a complete question.");
         return 0;
     }
 
-    // Get the intent and convert to lowercase
+    // Convert intent to lowercase
     char intent[MAX_INTENT];
     strncpy(intent, inv[0], MAX_INTENT - 1);
     intent[MAX_INTENT - 1] = '\0';
@@ -345,7 +340,7 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         strcat(entity, inv[i]);
     }
 
-    // Store current question for potential answer
+    // Store current question for potential future answer
     strncpy(last_intent, intent, MAX_INTENT - 1);
     last_intent[MAX_INTENT - 1] = '\0';
     strncpy(last_entity, entity, MAX_ENTITY - 1);
@@ -356,7 +351,6 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
 
     // Handle the result
     if (result == KB_NOTFOUND) {
-        // If no knowledge found, format the question back
         snprintf(response, n, "I don't know. ");
         if (entity_start == 2) {
             snprintf(response + strlen(response), n - strlen(response), 
@@ -365,8 +359,6 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
             snprintf(response + strlen(response), n - strlen(response), 
                     "%s %s?", inv[0], entity);
         }
-    } else if (result == KB_INVALID) {
-        snprintf(response, n, "I don't understand that type of question.");
     }
 
     return 0;
