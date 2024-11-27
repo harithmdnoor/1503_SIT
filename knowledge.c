@@ -35,15 +35,18 @@
 #include "chat1503C.h"
 
 #define FILE_NAME "ICT1503C_Project_Sample.ini"
-#define MAX_KNOWLEDGE_BASE_SIZE   64
-static KnowledgeEntry knowledge_base[MAX_KNOWLEDGE_BASE_SIZE];
-static int knowledge_base_size = 0; 
+#define MAX_INTENT 32
+#define MAX_ENTITY 64
+#define MAX_RESPONSE 256
 
-typedef struct {
-        char intent[MAX_INTENT];
-        char entity[MAX_ENTITY];
-        char response[MAX_RESPONSE];
-    } KnowledgeEntry;
+typedef struct KnowledgeNode {
+    char intent[MAX_INTENT];
+    char entity[MAX_ENTITY];
+    char response[MAX_RESPONSE];
+    struct KnowledgeNode *next;
+} KnowledgeNode;
+
+KnowledgeNode *knowledgeBase = NULL;
 
 /*
  * Get the response to a question.
@@ -61,22 +64,19 @@ typedef struct {
  */
 // Get the response to a question
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
-    // Return invalid if any input is NULL
     if (intent == NULL || entity == NULL || response == NULL) {
         return KB_INVALID;
     }
-
-    // Search the knowledge base for a matching intent and entity
-    for (int i = 0; i < knowledge_base_size; i++) {
-        if (strcmp(knowledge_base[i].intent, intent) == 0 && strcmp(knowledge_base[i].entity, entity) == 0) {
-            // Copy the response to the provided buffer
-            strncpy(response, knowledge_base[i].response, n - 1);
+    KnowledgeNode *current = knowledgeBase;
+    while (current != NULL) {
+        if (strcmp(current->intent, intent) == 0 && strcmp(current->entity, entity) == 0) {
+            strncpy(response, current->response, n - 1);
             response[n - 1] = '\0';
             return KB_OK;
         }
+        current = current->next;
     }
 
-    // Return not found if no match is found
     return KB_NOTFOUND;
 }
 
@@ -97,30 +97,25 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  *   KB_INVALID, if the intent is not a valid question word
  */
 int knowledge_put(const char *intent, const char *entity, const char *response) {
-    // Validate intent
     if (strcmp(intent, "what") != 0 && strcmp(intent, "where") != 0 && strcmp(intent, "who") != 0) {
         return KB_INVALID;
     }
 
-    // Traverse the linked list to find an existing node with the same intent and entity
     KnowledgeNode *current = knowledgeBase;
     while (current != NULL) {
         if (strcmp(current->intent, intent) == 0 && strcmp(current->entity, entity) == 0) {
-            // Update the response if the intent and entity match
             strncpy(current->response, response, MAX_RESPONSE - 1);
-            current->response[MAX_RESPONSE - 1] = '\0'; // Ensure null-termination
+            current->response[MAX_RESPONSE - 1] = '\0';
             return KB_OK;
         }
         current = current->next;
     }
 
-    // If no match is found, create a new node
     KnowledgeNode *newNode = (KnowledgeNode *)malloc(sizeof(KnowledgeNode));
     if (newNode == NULL) {
-        return KB_NOMEM; // Memory allocation failure
+        return KB_NOMEM;
     }
 
-    // Initialize the new node
     strncpy(newNode->intent, intent, MAX_INTENT - 1);
     newNode->intent[MAX_INTENT - 1] = '\0';
     strncpy(newNode->entity, entity, MAX_ENTITY - 1);
@@ -128,9 +123,8 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
     strncpy(newNode->response, response, MAX_RESPONSE - 1);
     newNode->response[MAX_RESPONSE - 1] = '\0';
     newNode->next = knowledgeBase;
-
-    // Insert the new node at the beginning of the linked list
     knowledgeBase = newNode;
+
     return KB_OK;
 
 }
@@ -145,8 +139,7 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
  * Returns: the number of entity/response pairs successful read from the file
  */
 int knowledge_read(FILE *f) {
-    // Return if file is NULL
-    if (f == NULL) {
+if (f == NULL) {
         return 0;
     }
 
@@ -158,20 +151,16 @@ int knowledge_read(FILE *f) {
     int count = 0;
     int in_section = 0;
 
-    // Read each line from the file
     while (fgets(line, sizeof(line), f) != NULL) {
-        // Remove trailing newline character
         char *newline = strchr(line, '\n');
         if (newline) {
             *newline = '\0';
         }
 
-        // Skip blank lines
         if (line[0] == '\0') {
             continue;
         }
 
-        // Check if the line is a section header
         if (line[0] == '[') {
             char *end_bracket = strchr(line, ']');
             if (end_bracket) {
@@ -185,7 +174,6 @@ int knowledge_read(FILE *f) {
             continue;
         }
 
-        // Parse entity-response pairs if in a valid section
         if (in_section) {
             char *equals_sign = strchr(line, '=');
             if (equals_sign) {
@@ -194,18 +182,8 @@ int knowledge_read(FILE *f) {
                 entity[MAX_ENTITY - 1] = '\0';
                 strncpy(response, equals_sign + 1, MAX_RESPONSE - 1);
                 response[MAX_RESPONSE - 1] = '\0';
-
-                // Add entity-response pair to the knowledge base
-                if (knowledge_base_size < MAX_KNOWLEDGE_BASE_SIZE) {
-                    strncpy(knowledge_base[knowledge_base_size].intent, intent, MAX_INTENT - 1);
-                    knowledge_base[knowledge_base_size].intent[MAX_INTENT - 1] = '\0';
-                    strncpy(knowledge_base[knowledge_base_size].entity, entity, MAX_ENTITY - 1);
-                    knowledge_base[knowledge_base_size].entity[MAX_ENTITY - 1] = '\0';
-                    strncpy(knowledge_base[knowledge_base_size].response, response, MAX_RESPONSE - 1);
-                    knowledge_base[knowledge_base_size].response[MAX_RESPONSE - 1] = '\0';
-                    knowledge_base_size++;
-                    count++;
-                }
+                knowledge_put(intent, entity, response);
+                count++;
             }
         }
     }
@@ -214,25 +192,17 @@ int knowledge_read(FILE *f) {
 }
 
 
-
 /*
  * Reset the knowledge base, removing all know entitities from all intents.
  */
 void knowledge_reset() {
-
-  //Open file with "w" mode will overwrite the existing file making sure it is empty
-	FILE *fp = fopen(FILE_NAME, "w");
-
-  //Error checking if file cant be opened or dont exist
-  if (fp == NULL) {
-    perror("Error opening file");
-    return 1;
-  }
-
-  //Close file
-  fclose(fp);
-
-  return;
+KnowledgeNode *current = knowledgeBase;
+    while (current != NULL) {
+        KnowledgeNode *temp = current;
+        current = current->next;
+        free(temp);
+    }
+    knowledgeBase = NULL;
 }
 
 
@@ -248,33 +218,9 @@ void knowledge_write(FILE *f) {
         return;
     }
 
-    // Keep track of written intents to avoid duplicates
-    char written_intents[MAX_KNOWLEDGE_BASE_SIZE][MAX_INTENT] = {0};
-    int written_count = 0;
-
-    for (int i = 0; i < knowledge_base_size; i++) { 
-        // Check if this intent has already been written
-        int already_written = 0;
-        for (int k = 0; k < written_count; k++) {
-            if (strcmp(written_intents[k], knowledge_base[i].intent) == 0) {
-                already_written = 1;
-                break;
-            }
-        }
-
-        if (!already_written) {
-            // Write the intent
-            fprintf(f, "[%s]\n", knowledge_base[i].intent);
-            // Record that we've written this intent
-            strcpy(written_intents[written_count++], knowledge_base[i].intent);
-
-            // Write all matching entities and responses
-            for (int j = 0; j < knowledge_base_size; j++) { 
-                if (strcmp(knowledge_base[i].intent, knowledge_base[j].intent) == 0) {
-                    fprintf(f, "%s=%s\n", knowledge_base[j].entity, knowledge_base[j].response);
-                }
-            }
-            fprintf(f, "\n"); // Add an extra newline for better readability
-        }
+    KnowledgeNode *current = knowledgeBase;
+    while (current != NULL) {
+        fprintf(f, "[%s]\n%s=%s\n\n", current->intent, current->entity, current->response);
+        current = current->next;
     }
 }
