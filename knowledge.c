@@ -212,7 +212,38 @@ void knowledge_reset() {
  *   f - the file
  */
 void knowledge_write(FILE *f) {
+    if (f == NULL) {
+        perror("Error opening file");
+        return;
+    }
 
-	/* TO BE IMPLEMENTED */
+    // Keep track of written intents to avoid duplicates
+    char written_intents[MAX_KNOWLEDGE_BASE_SIZE][MAX_INTENT] = {0};
+    int written_count = 0;
 
+    for (int i = 0; i < knowledge_base_size; i++) { 
+        // Check if this intent has already been written
+        int already_written = 0;
+        for (int k = 0; k < written_count; k++) {
+            if (strcmp(written_intents[k], knowledge_base[i].intent) == 0) {
+                already_written = 1;
+                break;
+            }
+        }
+
+        if (!already_written) {
+            // Write the intent
+            fprintf(f, "[%s]\n", knowledge_base[i].intent);
+            // Record that we've written this intent
+            strcpy(written_intents[written_count++], knowledge_base[i].intent);
+
+            // Write all matching entities and responses
+            for (int j = 0; j < knowledge_base_size; j++) { 
+                if (strcmp(knowledge_base[i].intent, knowledge_base[j].intent) == 0) {
+                    fprintf(f, "%s=%s\n", knowledge_base[j].entity, knowledge_base[j].response);
+                }
+            }
+            fprintf(f, "\n"); // Add an extra newline for better readability
+        }
+    }
 }
