@@ -70,17 +70,67 @@ static KnowledgeNode* knowledge_base = NULL;  // Head of the linked list
 // Get the response to a question
 
 int knowledge_get(const char *intent, const char *entity, char *response, int n) {
-    // Input validation
+    // Validate inputs
     if (intent == NULL || entity == NULL || response == NULL || n <= 0) {
         return KB_INVALID;
     }
 
-    // Search through the linked list
+    // If knowledge base is empty, try to load from file
+    if (knowledge_base == NULL) {
+        FILE* f = fopen("ICT1503C_Project_Sample.ini", "r");
+        if (f != NULL) {
+            char line[MAX_INPUT];
+            char current_intent[MAX_INTENT] = "";
+
+            while (fgets(line, sizeof(line), f)) {
+                // Remove newline
+                line[strcspn(line, "\n")] = 0;
+                
+                // Skip empty lines
+                if (strlen(line) == 0) continue;
+
+                // Check for section header
+                if (line[0] == '[') {
+                    char* end = strchr(line, ']');
+                    if (end) {
+                        *end = '\0';
+                        strncpy(current_intent, line + 1, MAX_INTENT - 1);
+                        current_intent[MAX_INTENT - 1] = '\0';
+                    }
+                    continue;
+                }
+
+                // Parse entity=response pairs
+                char* separator = strchr(line, '=');
+                if (separator && strlen(current_intent) > 0) {
+                    *separator = '\0';
+                    char* file_entity = line;
+                    char* file_response = separator + 1;
+
+                    // Create new node
+                    KnowledgeNode* new_node = (KnowledgeNode*)malloc(sizeof(KnowledgeNode));
+                    if (new_node != NULL) {
+                        strncpy(new_node->intent, current_intent, MAX_INTENT - 1);
+                        new_node->intent[MAX_INTENT - 1] = '\0';
+                        strncpy(new_node->entity, file_entity, MAX_ENTITY - 1);
+                        new_node->entity[MAX_ENTITY - 1] = '\0';
+                        strncpy(new_node->response, file_response, MAX_RESPONSE - 1);
+                        new_node->response[MAX_RESPONSE - 1] = '\0';
+
+                        new_node->next = knowledge_base;
+                        knowledge_base = new_node;
+                    }
+                }
+            }
+            fclose(f);
+        }
+    }
+
+    // Search knowledge base
     KnowledgeNode* current = knowledge_base;
     while (current != NULL) {
         if (strcasecmp(current->intent, intent) == 0 && 
             strcasecmp(current->entity, entity) == 0) {
-            // Copy the response safely
             strncpy(response, current->response, n - 1);
             response[n - 1] = '\0';
             return KB_OK;
@@ -88,7 +138,6 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
         current = current->next;
     }
 
-    // No matching response found
     return KB_NOTFOUND;
 }
 
@@ -123,36 +172,73 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
         return KB_INVALID;
     }
 
-    // Check if entry exists
+    // Prepare response with period if needed
+    char temp_response[MAX_RESPONSE];
+    strncpy(temp_response, response, MAX_RESPONSE - 2);
+    temp_response[MAX_RESPONSE - 2] = '\0';
+    if (strlen(temp_response) > 0 && temp_response[strlen(temp_response) - 1] != '.') {
+        strcat(temp_response, ".");
+    }
+
+    // First update/add to linked list
     KnowledgeNode* current = knowledge_base;
     while (current != NULL) {
         if (strcasecmp(current->intent, intent) == 0 && 
             strcasecmp(current->entity, entity) == 0) {
             // Update existing entry
-            strncpy(current->response, response, MAX_RESPONSE - 1);
+            strncpy(current->response, temp_response, MAX_RESPONSE - 1);
             current->response[MAX_RESPONSE - 1] = '\0';
-            return KB_OK;
+            break;
         }
         current = current->next;
     }
 
-    // Create new node
-    KnowledgeNode* new_node = (KnowledgeNode*)malloc(sizeof(KnowledgeNode));
-    if (new_node == NULL) {
-        return KB_NOMEM;
+    // If not found in list, create new node
+    if (current == NULL) {
+        KnowledgeNode* new_node = (KnowledgeNode*)malloc(sizeof(KnowledgeNode));
+        if (new_node == NULL) {
+            return KB_NOMEM;
+        }
+
+        // Initialize new node
+        strncpy(new_node->intent, intent, MAX_INTENT - 1);
+        new_node->intent[MAX_INTENT - 1] = '\0';
+        strncpy(new_node->entity, entity, MAX_ENTITY - 1);
+        new_node->entity[MAX_ENTITY - 1] = '\0';
+        strncpy(new_node->response, temp_response, MAX_RESPONSE - 1);
+        new_node->response[MAX_RESPONSE - 1] = '\0';
+
+        // Add to front of list
+        new_node->next = knowledge_base;
+        knowledge_base = new_node;
     }
 
-    // Initialize new node
-    strncpy(new_node->intent, intent, MAX_INTENT - 1);
-    new_node->intent[MAX_INTENT - 1] = '\0';
-    strncpy(new_node->entity, entity, MAX_ENTITY - 1);
-    new_node->entity[MAX_ENTITY - 1] = '\0';
-    strncpy(new_node->response, response, MAX_RESPONSE - 1);
-    new_node->response[MAX_RESPONSE - 1] = '\0';
+    // Rest of your code remains exactly the same
+    FILE* f = fopen("ICT1503C_Project_Sample.ini", "w");
+    if (f == NULL) {
+        return KB_INVALID;
+    }
 
-    // Add to front of list
-    new_node->next = knowledge_base;
-    knowledge_base = new_node;
+    // Write all sections
+    const char* sections[] = {"what", "where", "who"};
+    for (int i = 0; i < 3; i++) {
+        int section_started = 0;
+        current = knowledge_base;
+        
+        // Go through all entries for this section
+        while (current != NULL) {
+            if (strcasecmp(current->intent, sections[i]) == 0) {
+                if (!section_started) {
+                    fprintf(f, "\n[%s]\n", sections[i]);
+                    section_started = 1;
+                }
+                fprintf(f, "%s=%s\n", current->entity, current->response);
+            }
+            current = current->next;
+        }
+    }
+
+    fclose(f);
     return KB_OK;
 }
 
@@ -226,19 +312,15 @@ int knowledge_read(FILE *f) {
  */
 void knowledge_reset() {
     // Free all nodes
-    KnowledgeNode *current = knowledge_base;
-    while (current != NULL) {
-        KnowledgeNode *next = current->next;
-        free(current);
-        current = next;
+    while (knowledge_base != NULL) {
+        KnowledgeNode* temp = knowledge_base;
+        knowledge_base = knowledge_base->next;
+        free(temp);
     }
+    
+    // Don't clear the file on reset - just clear memory
+    // This way the file acts as a backup that can be reloaded
     knowledge_base = NULL;
-
-    // Clear file
-    FILE *fp = fopen(FILE_NAME, "w");
-    if (fp != NULL) {
-        fclose(fp);
-    }
 }
 
 

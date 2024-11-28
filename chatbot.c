@@ -216,6 +216,7 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
 }
 
 
+
 /* CONTRIBUTED BY : RAZAN
  * Determine whether an intent is a question.
  *
@@ -268,99 +269,117 @@ int chatbot_is_question(const char *intent) {
  */
 
 int chatbot_do_question(int inc, char *inv[], char *response, int n) {
-    // Input validation
     if (inc < 1 || inv == NULL || response == NULL || n <= 0) {
         snprintf(response, n, "Invalid input.");
         return 0;
     }
 
-    // Check if this is potentially an answer (i.e., not a question)
-    int is_answer = !chatbot_is_question(inv[0]);
+    // First, check if this is a command
+    if (chatbot_is_reset(inv[0])) {
+        return chatbot_do_reset(inc, inv, response, n);
+    }
+    if (chatbot_is_load(inv[0])) {
+        return chatbot_do_load(inc, inv, response, n);
+    }
+    if (chatbot_is_save(inv[0])) {
+        return chatbot_do_save(inc, inv, response, n);
+    }
+    if (chatbot_is_exit(inv[0])) {
+        return chatbot_do_exit(inc, inv, response, n);
+    }
 
-    if (is_answer) {
-        // If there was no previous question to answer
-        if (strlen(last_intent) == 0 || strlen(last_entity) == 0) {
-            snprintf(response, n, "Please ask a question first.");
+    // Get lowercase version of first word for question detection
+    char first_word[MAX_INTENT];
+    strncpy(first_word, inv[0], MAX_INTENT - 1);
+    first_word[MAX_INTENT - 1] = '\0';
+    for (int i = 0; first_word[i]; i++) {
+        first_word[i] = tolower(first_word[i]);
+    }
+
+    // Check if this is a question
+    int is_question = (strcmp(first_word, "what") == 0 ||
+                      strcmp(first_word, "where") == 0 ||
+                      strcmp(first_word, "who") == 0);
+
+    // If it's a new question, process it
+    if (is_question) {
+        // Clear any previous question state
+        last_intent[0] = '\0';
+        last_entity[0] = '\0';
+
+        if (inc < 2) {
+            snprintf(response, n, "Please ask a complete question.");
             return 0;
         }
 
-        // Combine all words into the response
+        // Find where the entity starts (after "is"/"are" if present)
+        int entity_start = 1;
+        if (inc > 2 && (compare_token(inv[1], "is") == 0 || compare_token(inv[1], "are") == 0)) {
+            entity_start = 2;
+        }
+
+        if (entity_start >= inc) {
+            snprintf(response, n, "What would you like to know about?");
+            return 0;
+        }
+
+        // Build entity string
+        char entity[MAX_ENTITY] = "";
+        for (int i = entity_start; i < inc; i++) {
+            if (strlen(entity) > 0) {
+                strcat(entity, " ");
+            }
+            strcat(entity, inv[i]);
+        }
+
+        // Try to get the answer
+        int result = knowledge_get(first_word, entity, response, n);
+
+        if (result == KB_NOTFOUND) {
+            // Store current question for potential learning
+            strncpy(last_intent, first_word, MAX_INTENT - 1);
+            last_intent[MAX_INTENT - 1] = '\0';
+            strncpy(last_entity, entity, MAX_ENTITY - 1);
+            last_entity[MAX_ENTITY - 1] = '\0';
+
+            // Format the "I don't know" response
+            snprintf(response, n, "I don't know. ");
+            if (entity_start == 2) {
+                snprintf(response + strlen(response), n - strlen(response), 
+                        "%s %s %s?", inv[0], inv[1], entity);
+            } else {
+                snprintf(response + strlen(response), n - strlen(response), 
+                        "%s %s?", inv[0], entity);
+            }
+        }
+        return 0;
+    }
+    
+    // If we have a pending question and this isn't a new question, treat it as an answer
+    else if (strlen(last_intent) > 0 && strlen(last_entity) > 0) {
+        // Build the answer string
         char answer[MAX_RESPONSE] = "";
         for (int i = 0; i < inc; i++) {
             if (i > 0) strcat(answer, " ");
             strcat(answer, inv[i]);
         }
         
-        // Put this into the knowledge base using the previously stored intent
+        // Store the new knowledge
         int result = knowledge_put(last_intent, last_entity, answer);
         if (result == KB_OK) {
             snprintf(response, n, "Thank you.");
+            
+            // Clear the last question state
+            last_intent[0] = '\0';
+            last_entity[0] = '\0';
         } else {
-            snprintf(response, n, "I couldn't understand that response.");
+            snprintf(response, n, "I couldn't store that information.");
         }
-
-        // Clear the last question
-        last_intent[0] = '\0';
-        last_entity[0] = '\0';
         return 0;
     }
-
-    // From here on, we're handling a new question
-    // Handle question processing
-    if (inc < 2) {
-        snprintf(response, n, "Please ask a complete question.");
-        return 0;
-    }
-
-    // Convert intent to lowercase
-    char intent[MAX_INTENT];
-    strncpy(intent, inv[0], MAX_INTENT - 1);
-    intent[MAX_INTENT - 1] = '\0';
-    for (int i = 0; intent[i]; i++) {
-        intent[i] = tolower(intent[i]);
-    }
-
-    // Find where the entity starts (after "is"/"are" if present)
-    int entity_start = 1;
-    if (inc > 2 && (compare_token(inv[1], "is") == 0 || compare_token(inv[1], "are") == 0)) {
-        entity_start = 2;
-    }
-
-    if (entity_start >= inc) {
-        snprintf(response, n, "What would you like to know about?");
-        return 0;
-    }
-
-    // Build entity string with exact casing from input
-    char entity[MAX_ENTITY] = "";
-    for (int i = entity_start; i < inc; i++) {
-        if (strlen(entity) > 0) {
-            strcat(entity, " ");
-        }
-        strcat(entity, inv[i]);
-    }
-
-    // Store current question for potential future answer
-    strncpy(last_intent, intent, MAX_INTENT - 1);
-    last_intent[MAX_INTENT - 1] = '\0';
-    strncpy(last_entity, entity, MAX_ENTITY - 1);
-    last_entity[MAX_ENTITY - 1] = '\0';
-
-    // Get response from knowledge base
-    int result = knowledge_get(intent, entity, response, n);
-
-    // Handle the result
-    if (result == KB_NOTFOUND) {
-        snprintf(response, n, "I don't know. ");
-        if (entity_start == 2) {
-            snprintf(response + strlen(response), n - strlen(response), 
-                    "%s %s %s?", inv[0], inv[1], entity);
-        } else {
-            snprintf(response + strlen(response), n - strlen(response), 
-                    "%s %s?", inv[0], entity);
-        }
-    }
-
+    
+    // If we get here, it's neither a question, command, nor an answer to a pending question
+    snprintf(response, n, "Please ask a question starting with what, where, or who.");
     return 0;
 }
 
@@ -393,11 +412,19 @@ int chatbot_is_reset(const char *intent) {
  * CONTRIBUTED BY : RAZAN
  */
 int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
-
-	knowledge_reset(); // Clear conversation history
-	snprintf(response, n, "Chatbot reset.");
-	return 0;
-
+    // Clear the in-memory knowledge base
+    knowledge_reset();
+    
+    // Clear the file content but keep the structure
+    FILE* f = fopen("ICT1503C_Project_Sample.ini", "w");
+    if (f != NULL) {
+        // Write the section headers to maintain structure
+        fprintf(f, "[what]\n\n[where]\n\n[who]\n");
+        fclose(f);
+    }
+    
+    snprintf(response, n, "Chatbot reset.");
+    return 0;
 }
 
 
