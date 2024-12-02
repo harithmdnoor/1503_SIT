@@ -53,7 +53,7 @@ typedef struct WrittenIntent {
 #define MAX_KNOWLEDGE_BASE_SIZE   64
 static KnowledgeNode* knowledge_base = NULL;  // Head of the linked list
 
-/*
+/* Author : Hafiz
  * Get the response to a question.
  *
  * Input:
@@ -144,7 +144,7 @@ int knowledge_get(const char *intent, const char *entity, char *response, int n)
  
 
 
-/*
+/* Author : Harith
  * Insert a new response to a question. If a response already exists for the
  * given intent and entity, it will be overwritten. Otherwise, it will be added
  * to the knowledge base.
@@ -165,14 +165,14 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
         return KB_INVALID;
     }
 
-    // Validate intent is a recognized question word
+    // Validate intent if it is a recognized question word
     if (strcasecmp(intent, "what") != 0 && 
         strcasecmp(intent, "where") != 0 && 
         strcasecmp(intent, "who") != 0) {
         return KB_INVALID;
     }
 
-    // Prepare response with period if needed
+    // Prepare response with period if required
     char temp_response[MAX_RESPONSE];
     strncpy(temp_response, response, MAX_RESPONSE - 2);
     temp_response[MAX_RESPONSE - 2] = '\0';
@@ -208,24 +208,23 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
         strncpy(new_node->response, temp_response, MAX_RESPONSE - 1);
         new_node->response[MAX_RESPONSE - 1] = '\0';
 
-        // Add to front of list
+        // Add to the front of linked list
         new_node->next = knowledge_base;
         knowledge_base = new_node;
     }
 
-    // Rest of your code remains exactly the same
     FILE* f = fopen("ICT1503C_Project_Sample.ini", "w");
     if (f == NULL) {
         return KB_INVALID;
     }
 
-    // Write all sections
+    // Write sections [what, where, who]
     const char* sections[] = {"what", "where", "who"};
     for (int i = 0; i < 3; i++) {
         int section_started = 0;
         current = knowledge_base;
         
-        // Go through all entries for this section
+        // Go through all entries for section
         while (current != NULL) {
             if (strcasecmp(current->intent, sections[i]) == 0) {
                 if (!section_started) {
@@ -243,7 +242,7 @@ int knowledge_put(const char *intent, const char *entity, const char *response) 
 }
 
 
-/*
+/* Author : Hafiz
  * Read a knowledge base from a file.
  *
  * Input:
@@ -307,7 +306,7 @@ int knowledge_read(FILE *f) {
 
 
 
-/*
+/* Author : Fitri
  * Reset the knowledge base, removing all know entitities from all intents.
  */
 void knowledge_reset() {
@@ -318,13 +317,12 @@ void knowledge_reset() {
         free(temp);
     }
     
-    // Don't clear the file on reset - just clear memory
-    // This way the file acts as a backup that can be reloaded
+    // clear memory
     knowledge_base = NULL;
 }
 
 
-/*
+/* Author : Fitri
  * Write the knowledge base to a file.
  *
  * Input:
@@ -339,7 +337,6 @@ void knowledge_write(FILE *f) {
     WrittenIntent* written_intents = NULL;
     int written_count = 0;
 
-    // For each node
     KnowledgeNode *current = knowledge_base;
     while (current != NULL) {
         // Check if intent already written

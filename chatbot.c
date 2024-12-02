@@ -126,7 +126,7 @@ int chatbot_main(int inc, char *inv[], char *response, int n) {
 }
 
 
-/*
+/* Author : Harith
  * Determine whether an intent is EXIT.
  *
  * Input:
@@ -143,7 +143,7 @@ int chatbot_is_exit(const char *intent) {
 }
 
 
-/*
+/* Author : Hafiz
  * Perform the EXIT intent.
  *
  * See the comment at the top of the file for a description of how this
@@ -161,7 +161,7 @@ int chatbot_do_exit(int inc, char *inv[], char *response, int n) {
 }
 
 
-/*
+/* Author : Hafiz
  * Determine whether an intent is LOAD.
  *
  * Input:
@@ -172,13 +172,13 @@ int chatbot_do_exit(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_load(const char *intent) {
-	// fitri
+	
 	return compare_token(intent, "load") == 0;
 
 }
 
 
-/*
+/* Author : Harith
  * Load a chatbot's knowledge base from a file.
  *
  * See the comment at the top of the file for a description of how this
@@ -194,7 +194,7 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
-    // Open the file specified in the second word of the user input
+    // Open the file specified in the second word of user input
     const char *filename = inv[1];
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -202,7 +202,7 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
-    // Use knowledge_read() to read the knowledge base from the file
+    // Use knowledge_read() to read from file
     int pairs_read = knowledge_read(file);
     fclose(file);
 
@@ -217,8 +217,8 @@ int chatbot_do_load(int inc, char *inv[], char *response, int n) {
 
 
 
-/* CONTRIBUTED BY : RAZAN
- * Determine whether an intent is a question.
+/* Author : Fitri
+ * Determine whether an intent is a question. 
  *
  * Input:
  *  intent - the intent
@@ -233,7 +233,7 @@ int chatbot_is_question(const char *intent) {
 		return 0;
 	}
 
-	/* Variables for method */
+	/* Variables */
 	char intent_lower[MAX_INTENT];
 	int i = 0;
 	
@@ -253,7 +253,7 @@ int chatbot_is_question(const char *intent) {
 }
 
 
-/* CONTRIBUTED BY : RAZAN & FITRI & HARITH & HAFIZ
+/* Author : Razan
  * Answer a question.
  *
  * inv[0] contains the the question word.
@@ -265,7 +265,7 @@ int chatbot_is_question(const char *intent) {
  *
  * Returns:
  *   0 (the chatbot always continues chatting after a question)
- *  STILL NEED TO IMPLEMENT
+ *  
  */
 
 int chatbot_do_question(int inc, char *inv[], char *response, int n) {
@@ -274,7 +274,7 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
-    // First, check if this is a command
+    // First, check user's input for specific commands (RESET, LOAD, SAVE, EXIT)
     if (chatbot_is_reset(inv[0])) {
         return chatbot_do_reset(inc, inv, response, n);
     }
@@ -336,13 +336,13 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         int result = knowledge_get(first_word, entity, response, n);
 
         if (result == KB_NOTFOUND) {
-            // Store current question for potential learning
+            // Store current question for learning
             strncpy(last_intent, first_word, MAX_INTENT - 1);
             last_intent[MAX_INTENT - 1] = '\0';
             strncpy(last_entity, entity, MAX_ENTITY - 1);
             last_entity[MAX_ENTITY - 1] = '\0';
 
-            // Format the "I don't know" response
+            // "I don't know" response
             snprintf(response, n, "I don't know. ");
             if (entity_start == 2) {
                 snprintf(response + strlen(response), n - strlen(response), 
@@ -355,7 +355,7 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
     
-    // If we have a pending question and this isn't a new question, treat it as an answer
+    // If we have a pending question and this is not a question, treat it as an answer
     else if (strlen(last_intent) > 0 && strlen(last_entity) > 0) {
         // Build the answer string
         char answer[MAX_RESPONSE] = "";
@@ -378,13 +378,13 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
         return 0;
     }
     
-    // If we get here, it's neither a question, command, nor an answer to a pending question
+    // If we get here, it's not a question, command, nor an answer to a pending question
     snprintf(response, n, "Please ask a question starting with what, where, or who.");
     return 0;
 }
 
 
-/*
+/* Author : Razan
  * Determine whether an intent is RESET.
  *
  * Input:
@@ -395,12 +395,12 @@ int chatbot_do_question(int inc, char *inv[], char *response, int n) {
  *  0, otherwise
  */
 int chatbot_is_reset(const char *intent) {
-	//harith
+
     return compare_token(intent, "RESET") == 0 || compare_token(intent, "reset") == 0;
 }
 
 
-/*
+/* Author : Fitri
  * Reset the chatbot.
  *
  * See the comment at the top of the file for a description of how this
@@ -409,7 +409,6 @@ int chatbot_is_reset(const char *intent) {
  * Returns:
  *   0 (the chatbot always continues chatting after being reset)
  *
- * CONTRIBUTED BY : RAZAN
  */
 int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
     // Clear the in-memory knowledge base
@@ -418,7 +417,7 @@ int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
     // Clear the file content but keep the structure
     FILE* f = fopen("ICT1503C_Project_Sample.ini", "w");
     if (f != NULL) {
-        // Write the section headers to maintain structure
+        // Write the section headers
         fprintf(f, "[what]\n\n[where]\n\n[who]\n");
         fclose(f);
     }
@@ -428,7 +427,7 @@ int chatbot_do_reset(int inc, char *inv[], char *response, int n) {
 }
 
 
-/*
+/* Author : Harith
  * Determine whether an intent is SAVE.
  *
  * Input:
@@ -445,7 +444,7 @@ int chatbot_is_save(const char *intent) {
 }
 
 
-/*
+/* Author : Razan
  * Save the chatbot's knowledge to a file.
  *
  * See the comment at the top of the file for a description of how this
@@ -461,7 +460,7 @@ int chatbot_do_save(int inc, char *inv[], char *response, int n) {
         return 0;
     }
 
-    // Check for "as" or "to" and adjust filename index
+    // Check for "as" or "to"
     int filename_index = 1;
     if (inc > 2 && (compare_token(inv[1], "as") == 0 || compare_token(inv[1], "to") == 0)) {
         filename_index = 2;
